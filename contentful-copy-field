@@ -18,20 +18,34 @@ if ARGV.length < 3
   exit 1
 end
 
-content_type = ARGV[0]
+content_type_id = ARGV[0]
 source_field = ARGV[1]
 dest_field = ARGV[2]
+field_type = nil
+
+content_type = space.content_types.find content_type_id
+content_type.fields.each do |field|
+  field_type = field.type if field.id == dest_field
+end
 
 query = {
-  content_type: content_type,
+  content_type: content_type_id,
   order: '-sys.createdAt'
 }
 
 entries = space.entries.all query
 loop do
   entries.each do |entry|
+
+    case field_type
+    when 'Array'
+      value = [entry.fields[source_field.to_sym]]
+    else
+      value = entry.fields[source_field.to_sym]
+    end
+
     updates = Hash.new
-    updates[dest_field.to_sym] = entry.fields[source_field.to_sym]
+    updates[dest_field.to_sym] = value
     entry.update updates
     entry.publish
     logger.info "Copied #{source_field} to #{dest_field} for #{entry.sys[:id]}"
