@@ -1,0 +1,41 @@
+#!/usr/bin/env ruby
+
+require 'contentful/management'
+require 'dotenv'
+require 'logger'
+Dotenv.load
+
+def usage
+  puts "contentful-copy-field [content type] [source field] [dest field]"
+end
+
+logger = Logger.new(STDOUT)
+client = Contentful::Management::Client.new(ENV['CF_ACCESS_TOKEN'])
+space = Contentful::Management::Space.find(ENV['CF_SPACE_ID'])
+
+if ARGV.length < 3
+  puts usage
+  exit 1
+end
+
+content_type = ARGV[0]
+source_field = ARGV[1]
+dest_field = ARGV[2]
+
+query = {
+  content_type: content_type,
+  order: '-sys.createdAt'
+}
+
+entries = space.entries.all query
+loop do
+  entries.each do |entry|
+    updates = Hash.new
+    updates[dest_field.to_sym] = entry.fields[source_field.to_sym]
+    entry.update updates
+    entry.publish
+    logger.info "Copied #{source_field} to #{dest_field} for #{entry.sys[:id]}"
+  end
+  entries = entries.next_page
+  break if entries.count == 0
+end
